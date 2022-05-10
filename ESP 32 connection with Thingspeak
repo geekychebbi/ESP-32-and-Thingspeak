@@ -1,0 +1,132 @@
+#include <ESP8266WiFi.h>
+#include "secrets.h"
+#include "ThingSpeak.h" // always include thingspeak header file after other header files and custom macros
+
+char ssid[] = SECRET_SSID;   // your network SSID (name) 
+char pass[] = SECRET_PASS;   // your network password
+int keyIndex = 0;            // your network key Index number (needed only for WEP)
+WiFiClient  client;
+
+unsigned long myChannelNumber = SECRET_CH_ID;
+const char * myWriteAPIKey = SECRET_WRITE_APIKEY;
+
+int number = 0;
+
+void setup() {
+  Serial.begin(115200);  // Initialize serial
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+  
+  WiFi.mode(WIFI_STA); 
+  ThingSpeak.begin(client);  // Initialize ThingSpeak
+}
+
+void loop() {
+
+  // Connect or reconnect to WiFi
+  if(WiFi.status() != WL_CONNECTED){
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(SECRET_SSID);
+    while(WiFi.status() != WL_CONNECTED){
+      WiFi.begin(ssid, pass);  // Connect to WPA/WPA2 network. Change this line if using open or WEP network
+      Serial.print(".");
+      delay(5000);     
+    } 
+    Serial.println("\nConnected.");
+  }
+  
+  // Write to ThingSpeak. There are up to 8 fields in a channel, allowing you to store up to 8 different
+  // pieces of information in a channel.  Here, we write to field 1.
+  int x = ThingSpeak.writeField(myChannelNumber, 1, number, myWriteAPIKey);
+  if(x == 200){
+    Serial.println("Channel update successful.");
+  }
+  else{
+    Serial.println("Problem updating channel. HTTP error code " + String(x));
+  }
+
+  // change the value
+  number++;
+  if(number > 99){
+    number = 0;
+  }
+  
+  delay(20000); // Wait 20 seconds to update the channel again
+}
+Typical Read Example
+In this case, read from a public channel and a private channel with an ESP8266. The public channel is the temperature(F) at MathWorks headquarters. The private channel is a counter that increments.
+
+#include <ESP8266WiFi.h>
+#include "secrets.h"
+#include "ThingSpeak.h" // always include thingspeak header file after other header files and custom macros
+
+char ssid[] = SECRET_SSID;   // your network SSID (name) 
+char pass[] = SECRET_PASS;   // your network password
+int keyIndex = 0;            // your network key Index number (needed only for WEP)
+WiFiClient  client;
+
+// Weather station channel details
+unsigned long weatherStationChannelNumber = SECRET_CH_ID_WEATHER_STATION;
+unsigned int temperatureFieldNumber = 4;
+
+// Counting channel details
+unsigned long counterChannelNumber = SECRET_CH_ID_COUNTER;
+const char * myCounterReadAPIKey = SECRET_READ_APIKEY_COUNTER;
+unsigned int counterFieldNumber = 1; 
+
+void setup() {
+ Serial.begin(115200);  // Initialize serial
+ while (!Serial) {
+   ; // wait for serial port to connect. Needed for native USB port only
+ }
+ 
+ WiFi.mode(WIFI_STA); 
+ ThingSpeak.begin(client);  // Initialize ThingSpeak
+}
+
+void loop() {
+
+ int statusCode = 0;
+ 
+ // Connect or reconnect to WiFi
+ if(WiFi.status() != WL_CONNECTED){
+   Serial.print("Attempting to connect to SSID: ");
+   Serial.println(SECRET_SSID);
+   while(WiFi.status() != WL_CONNECTED){
+     WiFi.begin(ssid, pass); // Connect to WPA/WPA2 network. Change this line if using open or WEP network
+     Serial.print(".");
+     delay(5000);     
+   } 
+   Serial.println("\nConnected");
+ }
+
+ // Read in field 4 of the public channel recording the temperature
+ float temperatureInF = ThingSpeak.readFloatField(weatherStationChannelNumber, temperatureFieldNumber);  
+
+ // Check the status of the read operation to see if it was successful
+ statusCode = ThingSpeak.getLastReadStatus();
+ if(statusCode == 200){
+   Serial.println("Temperature at MathWorks HQ: " + String(temperatureInF) + " deg F");
+ }
+ else{
+   Serial.println("Problem reading channel. HTTP error code " + String(statusCode)); 
+ }
+ 
+ delay(15000); // No need to read the temperature too often.
+
+ // Read in field 1 of the private channel which is a counter  
+ long count = ThingSpeak.readLongField(counterChannelNumber, counterFieldNumber, myCounterReadAPIKey);  
+
+  // Check the status of the read operation to see if it was successful
+ statusCode = ThingSpeak.getLastReadStatus();
+ if(statusCode == 200){
+   Serial.println("Counter: " + String(count));
+ }
+ else{
+   Serial.println("Problem reading channel. HTTP error code " + String(statusCode)); 
+ }
+ 
+ delay(15000); // No need to read the counter too often.
+ 
+}
